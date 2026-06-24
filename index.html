@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Curriculum Evaluator Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.4.21/mammoth.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.umd.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Roboto', sans-serif; }
+        .drag-active { border-color: #3b82f6; background-color: #eff6ff; }
+        .spinner {
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top: 3px solid white;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-gray-50 min-h-screen text-gray-800 p-6">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <header class="mb-10 flex flex-col md:flex-row justify-between items-center bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+            <div>
+                <h1 class="text-3xl font-bold text-gray-900 tracking-tight">Curriculum Evaluator Pro</h1>
+                <p class="text-gray-500 mt-1">AI-powered diagnostic and document correction tool.</p>
+            </div>
+            <div class="mt-4 md:mt-0 flex gap-2">
+                <input type="password" id="apiKey" placeholder="Gemini API Key" class="border border-gray-300 rounded-lg px-4 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none w-64 text-sm shadow-sm">
+                <button onclick="saveKey()" class="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-colors shadow-sm">Save</button>
+            </div>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Left Side: Inputs -->
+            <div class="space-y-6">
+                <!-- Framework Upload -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-1">1. Upload Guidelines</h2>
+                    <p class="text-sm text-gray-500 mb-4">Provide the diagnostic framework (PDF, DOCX, TXT).</p>
+
+                    <div id="dropZone1" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="document.getElementById('file1').click()">
+                        <svg class="mx-auto h-10 w-10 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/></svg>
+                        <span class="text-sm font-medium text-gray-700">Click or drag file here</span>
+                        <input type="file" id="file1" class="hidden" accept=".pdf,.docx,.txt,.md" onchange="handleFile(event, 1)">
+                    </div>
+                    <div id="status1" class="mt-3 text-sm text-center font-medium text-gray-600 hidden"></div>
+                </div>
+
+                <!-- Document Upload -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
+                    <h2 class="text-lg font-semibold text-gray-800 mb-1">2. Upload Teacher Document</h2>
+                    <p class="text-sm text-gray-500 mb-4">Provide the document to be evaluated (PDF, DOCX, TXT).</p>
+
+                    <div id="dropZone2" class="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center cursor-pointer hover:bg-gray-50 transition-colors" onclick="document.getElementById('file2').click()">
+                        <svg class="mx-auto h-10 w-10 text-blue-500 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                        <span class="text-sm font-medium text-gray-700">Click or drag file here</span>
+                        <input type="file" id="file2" class="hidden" accept=".pdf,.docx,.txt,.md" onchange="handleFile(event, 2)">
+                    </div>
+                    <div id="status2" class="mt-3 text-sm text-center font-medium text-gray-600 hidden"></div>
+                </div>
+
+                <!-- Action Button -->
+                <button id="runBtn" onclick="processDocuments()" class="w-full bg-blue-600 text-white font-bold py-4 rounded-2xl hover:bg-blue-700 transition-colors shadow-md flex justify-center items-center gap-2">
+                    <span>Evaluate & Fix</span>
+                    <div id="loader" class="spinner hidden"></div>
+                </button>
+            </div>
+
+            <!-- Right Side: Results -->
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex flex-col h-full min-h-[600px]">
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-semibold text-gray-800">Analysis Results</h2>
+                    <button id="downloadBtn" onclick="downloadWord()" class="hidden bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition-colors shadow-sm flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                        Download Fixed Document
+                    </button>
+                </div>
+
+                <div id="output" class="flex-grow bg-gray-50 border border-gray-200 rounded-xl p-5 overflow-y-auto font-mono text-sm whitespace-pre-wrap text-gray-700">Upload documents and click Evaluate to see the results here.</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // State
+        const state = {
+            framework: { text: null, base64: null, mime: null, name: null },
+            document: { text: null, base64: null, mime: null, name: null }
+        };
+
+        // Init
+        document.getElementById('apiKey').value = localStorage.getItem('gemini_key') || '';
+
+        function saveKey() {
+            localStorage.setItem('gemini_key', document.getElementById('apiKey').value);
+            alert('API Key saved to browser storage.');
+        }
+
+        // Drag and Drop
+        ['1', '2'].forEach(id => {
+            const zone = document.getElementById(`dropZone${id}`);
+            zone.ondragover = e => { e.preventDefault(); zone.classList.add('drag-active'); };
+            zone.ondragleave = e => { e.preventDefault(); zone.classList.remove('drag-active'); };
+            zone.ondrop = e => {
+                e.preventDefault();
+                zone.classList.remove('drag-active');
+                if (e.dataTransfer.files[0]) {
+                    document.getElementById(`file${id}`).files = e.dataTransfer.files;
+                    handleFile({ target: { files: e.dataTransfer.files } }, id);
+                }
+            };
+        });
+
+        async function handleFile(event, num) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const status = document.getElementById(`status${num}`);
+            status.textContent = `Processing ${file.name}...`;
+            status.className = "mt-3 text-sm text-center font-medium text-blue-600 block";
+
+            const target = num === 1 ? 'framework' : 'document';
+            state[target].name = file.name;
+            state[target].text = null;
+            state[target].base64 = null;
+
+            try {
+                if (file.name.endsWith('.docx')) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const result = await mammoth.extractRawText({arrayBuffer});
+                    state[target].text = result.value;
+                } else if (file.name.endsWith('.pdf')) {
+                    state[target].mime = "application/pdf";
+                    state[target].base64 = await new Promise((res) => {
+                        const reader = new FileReader();
+                        reader.onload = () => res(reader.result.split(',')[1]);
+                        reader.readAsDataURL(file);
+                    });
+                } else {
+                    state[target].text = await file.text();
+                }
+                status.textContent = `Ready: ${file.name}`;
+                status.className = "mt-3 text-sm text-center font-medium text-green-600 block";
+            } catch (err) {
+                status.textContent = "Error reading file";
+                status.className = "mt-3 text-sm text-center font-medium text-red-600 block";
+            }
+        }
+
+        async function processDocuments() {
+            const key = document.getElementById('apiKey').value;
+            if (!key) return alert("Please enter your Gemini API Key.");
+            if (!state.framework.text && !state.framework.base64) return alert("Please upload the Guidelines.");
+            if (!state.document.text && !state.document.base64) return alert("Please upload the Teacher Document.");
+
+            const btn = document.getElementById('runBtn');
+            const loader = document.getElementById('loader');
+            const output = document.getElementById('output');
+            const downloadBtn = document.getElementById('downloadBtn');
+
+            btn.disabled = true;
+            btn.classList.add('opacity-75');
+            loader.classList.remove('hidden');
+            downloadBtn.classList.add('hidden');
+            output.textContent = "Analyzing document against guidelines...\nThis may take up to a minute.";
+
+            const systemPrompt = `You are an expert Curriculum Evaluator. Your goal is to review a 'Teacher Document' based on a 'Diagnostic Framework/Guidelines'.
+You must check the document for:
+1. Accuracy: factual correctness.
+2. Authenticity: does it feel like real-world material?
+3. Purposefulness: do the questions match the cognitive demand of the target grade?
+
+Output strictly in this format:
+=== CRITIQUE ===
+Target Grade: [Grade]
+Analysis: [Your evaluation based on the 3 points]
+
+=== REVISED DOCUMENT ===
+[The complete, rewritten document, formatted clearly, that perfectly fixes all issues while remaining engaging for the students.]`;
+
+            const parts = [{text: "GUIDELINES:\n"}];
+
+            if (state.framework.base64) parts.push({inlineData: {mimeType: state.framework.mime, data: state.framework.base64}});
+            else parts.push({text: state.framework.text});
+
+            parts.push({text: "\n\n---\nTEACHER DOCUMENT:\n"});
+
+            if (state.document.base64) parts.push({inlineData: {mimeType: state.document.mime, data: state.document.base64}});
+            else parts.push({text: state.document.text});
+
+            try {
+                const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${key}`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        contents: [{parts}],
+                        systemInstruction: {parts: [{text: systemPrompt}]}
+                    })
+                });
+
+                if (!res.ok) throw new Error("API Request Failed");
+                const data = await res.json();
+                const text = data.candidates[0].content.parts[0].text;
+
+                output.textContent = text;
+                downloadBtn.classList.remove('hidden');
+            } catch (err) {
+                output.textContent = "Error: " + err.message;
+            } finally {
+                btn.disabled = false;
+                btn.classList.remove('opacity-75');
+                loader.classList.add('hidden');
+            }
+        }
+
+        function downloadWord() {
+            const text = document.getElementById('output').textContent;
+            let content = text;
+            if (text.includes("=== REVISED DOCUMENT ===")) {
+                content = text.split("=== REVISED DOCUMENT ===")[1].trim();
+            }
+
+            const { Document, Packer, Paragraph, TextRun } = docx;
+            const paragraphs = content.split('\n').map(line => new Paragraph({children: [new TextRun(line)]}));
+
+            Packer.toBlob(new Document({sections: [{properties: {}, children: paragraphs}]})).then(blob => {
+                const name = (state.document.name || "document").split('.')[0];
+                saveAs(blob, `Revised_${name}.docx`);
+            });
+        }
+    </script>
+</body>
+</html>
